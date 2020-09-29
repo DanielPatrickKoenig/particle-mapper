@@ -1,56 +1,65 @@
-app.executeMenuCommand("selectall");
-for(var i = 0; i < app.activeDocument.layers[0].pageItems.length;i++){
-    app.activeDocument.layers[0].pageItems[i].strokeDashes = new Array(1,12);
-}
-app.executeMenuCommand("Expand3");
-app.executeMenuCommand("deselectall");
-var listGroup = [];
-var listGroupString = '[';
-var n = 0;
-for(var i = app.activeDocument.layers[0].pageItems.length - 1; i >=0 ;i--){
-    // $.writeln(app.activeDocument.layers[0].pageItems[i]);
-    listGroupString += n == 0 ? '' : ',';
-    app.activeDocument.layers[0].pageItems[i].selected = true;
-    app.executeMenuCommand("ungroup");
-    app.executeMenuCommand("noCompoundPath");
-    listGroup.push([]);
-    listGroupString+='['
-    var m = 0;
-    var targetItem = app.activeDocument.layers[0].pathItems[0];
-    
-    while(m < app.activeDocument.layers[0].pathItems.length){
-        
-        listGroup[listGroup.length - 1].push(
-            {
-                x: targetItem.left,
-                y: targetItem.top * -1
-            }
-        );
 
-        listGroupString += m == 0 ? '' : ',';
-        listGroupString += '{x:'+targetItem.left.toString()+',y:'+(targetItem.top * -1).toString()+'}';
-        
-        
-        var pos = {left: targetItem.left, top: targetItem.top};
-        targetItem.left = 10000;
-        targetItem.top = 10000;
-        targetItem = getClosestPathItem(pos, app.activeDocument.layers[0].pathItems);
-        
-        
-        // app.activeDocument.layers[0].pathItems[j].remove();
-        m++;
+
+function createPaths(layer){
+    var currentLayer = layer;
+    app.executeMenuCommand("deselectall");
+    var firstPointList = [];
+    for(var i = 0; i < currentLayer.pathItems.length;i++){
+        currentLayer.pathItems[i].strokeDashes = new Array(1,12);
+        firstPointList.push({left: currentLayer.pathItems[i].pathPoints[0].anchor[0], top: currentLayer.pathItems[i].pathPoints[0].anchor[1]});
+        currentLayer.pathItems[i].selected = true;
     }
-    for(var j = app.activeDocument.layers[0].pathItems.length - 1; j >= 0;j--){
-        app.activeDocument.layers[0].pathItems[j].remove();
+
+    app.executeMenuCommand("Expand3");
+    app.executeMenuCommand("deselectall");
+    var listGroup = [];
+    var listGroupString = '[';
+    var n = 0;
+    for(var i = currentLayer.pageItems.length - 1; i >=0 ;i--){
+        // $.writeln(currentLayer.pageItems[i]);
+        listGroupString += n == 0 ? '' : ',';
+        currentLayer.pageItems[i].selected = true;
+        app.executeMenuCommand("ungroup");
+        app.executeMenuCommand("noCompoundPath");
+        listGroup.push([]);
+        listGroupString+='['
+        var m = 0;
+        // var targetItem = currentLayer.pathItems[0];
+        var targetItem = getClosestPathItem(firstPointList[i], currentLayer.pathItems);
+        
+        while(m < currentLayer.pathItems.length){
+            
+            listGroup[listGroup.length - 1].push(
+                {
+                    x: targetItem.left,
+                    y: targetItem.top * -1
+                }
+            );
+
+            listGroupString += m == 0 ? '' : ',';
+            listGroupString += '{x:'+targetItem.left.toString()+',y:'+(targetItem.top * -1).toString()+'}';
+            
+            
+            var pos = {left: targetItem.left, top: targetItem.top};
+            targetItem.left = 10000;
+            targetItem.top = 10000;
+            targetItem = getClosestPathItem(pos, currentLayer.pathItems);
+            
+            
+            // currentLayer.pathItems[j].remove();
+            m++;
+        }
+        for(var j = currentLayer.pathItems.length - 1; j >= 0;j--){
+            currentLayer.pathItems[j].remove();
+        }
+        listGroupString += ']';
+        n++;
+        
     }
     listGroupString += ']';
-    n++;
-    
+    return listGroupString;
 }
-listGroupString += ']';
-$.writeln(listGroupString);
 
-app.executeMenuCommand("undo");
 
 function getDistance(x1, y1, x2, y2) {
 
@@ -72,13 +81,34 @@ function getClosestPathItem(item, items){
 
 }
 
+var fileContent = 'const Points = [';
+//     {name: 'House', data: house},
+//     {name: 'Happy', data: happy},
+//     {name: 'Eye', data: eye},
+//     {name: 'Person', data: person},
+//     {name: 'Line Thing', data: linething}
+// ]
+// export default Points;
+
+for(var i = 0; i < app.activeDocument.layers.length;i++){
+    $.writeln(app.activeDocument.layers[i].name);
+    fileContent += i > 0 ? ',' : '';
+    var pathData = createPaths(app.activeDocument.layers[i]);
+    fileContent += "{ name: '" + app.activeDocument.layers[i].name + "', data: " + pathData + "}";
+}
+
+fileContent += ']; export default Points;';
+
+// var pathString = createPaths(app.activeDocument.layers[0]);
+$.writeln(fileContent);
+app.executeMenuCommand("undo");
 
 
 var scriptFolderPath = File($.fileName).path; // the URI of the folder that contains the script file    
 
 var JFile = new File(scriptFolderPath + encodeURI("/dot-and-outline-output.txt"));
 
-    var content = listGroupString;
+    var content = fileContent;
 
     
 
